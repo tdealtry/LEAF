@@ -3,7 +3,7 @@ Low Energy Algoritm Framework
 
 This algorithm is an alternative and simple LE fitter than can be used for HyperK and SuperK.
 
-~~~~~~~~~~~~~~~~~~~~~~~~~
+*************************
 2020/02/09: LEAF was convert as a C++ class and can be included in your code.
 
 New compilation method:
@@ -14,7 +14,7 @@ New compilation method:
 	
 In order to use the class in your code look at example/
 
-~~~~~~~~~~~~~~~~~~~~~~~~~
+*************************
 
 1. Source RunAtStart.sh after you updated your ROOT directory.
 
@@ -24,7 +24,7 @@ In order to use the class in your code look at example/
 
 4. You can use shell scripts in shell/ in order to run the fitter or launch on batch.
 
-~~~~~~~~~~~~~~~~~~~~~~~~~
+*************************
 
 ## Results
 
