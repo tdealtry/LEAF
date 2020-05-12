@@ -32,13 +32,13 @@ all: .depend ../lib/libBQFitter.so
 	@echo '<< generating ../lib/libBQFitter.so >>'
 #	@$(SOMAKER) $(SOFLAGS) -o ../lib/libBQFitter.so  BQFitter.o $(DICT).o $(LIBS) 
 	@$(SOMAKER) $(SOFLAGS) -o ../lib/libBQFitter.so  BQFitter.o $(LIBS) 
-	
+
 # root class dictionary
 #$(DICT).cc:  LinkDef.h
 #	@echo '<< generating CINT >>'
 #	@rootcint -f $(DICT).cc -c $(INCFLAGS) $(HEADERS) LinkDef.h
 
-	
+
 # default rules
 .cc.o: 
 	@echo '<< compiling' $< '>>'
@@ -51,7 +51,7 @@ all: .depend ../lib/libBQFitter.so
 %.o: %.cpp
 	@echo '<< compiling' $< '>>'
 	@$(CXX) $(CXXFLAGS) $(INCFLAGS) -c -o $@ $<
-	
+
 
 %.o: %.C %.h
 	@echo '<< compiling' $< '>>'
@@ -73,4 +73,4 @@ clean:
 	@rm -f ./*.o
 	@rm -f ./../lib*.so
 	@rm -f ./$(DICT)*
-	
+
