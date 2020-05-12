@@ -9,6 +9,10 @@
 #include "BQFitter.hh"
 #include "TStopwatch.h"
 
+#ifndef NORMALWCSIMHACK
+#define NORMALWCSIMHACK
+#endif //NORMALWCSIMHACK
+
 double BQFitter::fSTimePDFLimitsQueueNegative = 0;
 double BQFitter::fSTimePDFLimitsQueuePositive = 0;
 BQFitter* BQFitter::myFitter=NULL;
@@ -218,8 +222,13 @@ void BQFitter::SetGeometry( WCSimRootGeom * wGeo, double dDarkRate_Normal, doubl
 		fDarkRate_ns[1] = 100.   * 5e3 * /*fWCGeo->GetWCNumPMT(true ) */ 1e-9 * 19;
 	}
 	else {
+#ifdef NORMALWCSIMHACK
+	  fDarkRate_ns[0] = fDarkRate_Normal * fWCGeo->GetWCNumPMT() * 1e-9;
+	  fDarkRate_ns[1] = 0;
+#else
 		fDarkRate_ns[0] = fDarkRate_Normal * fWCGeo->GetWCNumPMT(false) * 1e-9;
 		fDarkRate_ns[1] = fDarkRate_mPMT   * fWCGeo->GetWCNumPMT(true ) * 1e-9 * 19;
+#endif
 	}
 	
 	this->LoadPMTInfo();
@@ -298,8 +307,13 @@ void BQFitter::LoadPMTInfo() {
 		fPMT_TubeInMPMT[iPMT]   = 0;
 	}*/
 	
+#ifdef NORMALWCSIMHACK
+	int iNbr_Norm = fWCGeo->GetWCNumPMT();
+	int iNbr_mPMT = 0;
+#else
 	int iNbr_Norm = fWCGeo->GetWCNumPMT(false);
 	int iNbr_mPMT = iNbr_Norm;// fWCGeo->GetWCNumPMT(true);
+#endif
 	
 	fPMT_Info	.resize(MAX_PMT);
 	fPMT_Group	.assign(MAX_PMT,0);
@@ -311,7 +325,12 @@ void BQFitter::LoadPMTInfo() {
 	// Normal PMTs
 	for ( int iPMT=0; iPMT < iNbr_Norm; iPMT++ ) {
 	
+
+#ifdef NORMALWCSIMHACK
+		wPMT = fWCGeo->GetPMT(iPMT);
+#else
 		wPMT = fWCGeo->GetPMT(iPMT,false);
+#endif
 		std::vector<double> vPMT(6,0);
 		
 		for ( int j=0; j < 3; j++ ) {
@@ -323,7 +342,8 @@ void BQFitter::LoadPMTInfo() {
 		fPMT_Group     [iPMT] = 0;
 		fPMT_Info      [iPMT] = vPMT;
 	}
-	
+
+#ifndef NORMALWCSIMHACK
 	// mPMTs
 	for ( int iPMT=0; iPMT < iNbr_mPMT; iPMT++ ) {
 	
@@ -341,6 +361,7 @@ void BQFitter::LoadPMTInfo() {
 		fPMT_Group     [iNewID] = this->GroupPMTs(1,wPMT.GetmPMT_PMTNo());
 		fPMT_Info      [iNewID] = vPMT;
 	}
+#endif
 }
 
 
