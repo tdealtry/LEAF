@@ -22,12 +22,12 @@ LIBS_BQFIT += -L${LEAFDIR}/lib -lBQFitter
 OBJECT = analysis
 
 all: $(OBJECT)
-	
+
 analysis: analysis.o 
 	@echo '<< compiling bin analysis >>'
 	@$(CXX) -g $(CXXFLAGS) -o $@ $^ $(LIBS) $(LIBS_BONSAI) $(LIBS_BQFIT)
-	
-	
+
+
 # default rules
 .cc.o: 
 	@echo '<< compiling' $< '>>'
@@ -40,7 +40,7 @@ analysis: analysis.o
 %.o: %.cpp
 	@echo '<< compiling' $< '>>'
 	@$(CXX) $(CXXFLAGS) $(INCFLAGS) -c -o $@ $<
-	
+
 
 %.o: %.C %.h
 	@echo '<< compiling' $< '>>'
@@ -53,4 +53,4 @@ clean:
 	@rm -f ./lib*.so
 	@rm -f ./bin/*
 	@rm -f $(OBJECT)
-	
+
