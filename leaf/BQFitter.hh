@@ -29,17 +29,25 @@
 #include "TFile.h"
 #include "TFitter.h"
 #include "TH1D.h"
+#include "TH2D.h"
+#include "TGraph2D.h"
+#include "TF1.h"
 #include "TMath.h"
 #include "TMinuit.h"
 #include "TObject.h"
 #include "TRandom3.h"
 #include "TSpline.h"
+#include "TPaletteAxis.h"
 
 // If using a WCSim version without mPMT implementation
-#define WCSIM_wo_mPMT
+#define WCSIM_single_PMT_type
+// If using a WCSim version with bugged number of PMT implementation
+#define BUG_WCGEO
 
 #define VERBOSE 		0
+//#define CHECK_TO_TRUE_VTX
 //#define VERBOSE_NLL
+//#define VERBOSE_WARNINGMINUIT
 
 // Verbose level in functions:
 #undef VERBOSE_VTX // In SearchVertex
@@ -63,12 +71,17 @@
 #define VTX_Z			2
 #define VTX_T			3
 
-#define GetPMTType(x)		x>=mPMT_ID_SHIFT?1:0
+#define GetPMTType(x)		(x>=mPMT_ID_SHIFT?1:0)
 #define GetDistance(a,b)	sqrt( (a[0]-b[0])*(a[0]-b[0]) + (a[1]-b[1])*(a[1]-b[1]) + (a[2]-b[2])*(a[2]-b[2]) )
+#define GetLength(a)		sqrt( (a[0]*a[0]) + (a[1]*a[1]) + (a[2]*a[2]) )
+#define GetScalarProd(a,b)	a[0]*b[0] + a[1]*b[1] + a[2]*b[2]
 
-#define N_THREAD		30
+#define N_THREAD		12
 
 #define CNS2CM 			21.58333
+
+// mPMT Info:
+#define mPMT_TOP_ID		19
 
 std::mutex mtx;
 
@@ -83,7 +96,7 @@ void SearchVertex_CallThread(
 			int iStart, int iIte,
 			int nhits,int tolerance,bool likelihood,double lowerLimit, double upperLimit,int directionality);
 
-bool SortOutputVector ( const std::vector<double>& v1, const std::vector<double>& v2 ) { 
+inline bool SortOutputVector ( const std::vector<double>& v1, const std::vector<double>& v2 ) { 
 	return v1[4] < v2[4]; 
 } 
 		
@@ -96,6 +109,7 @@ class BQFitter/* : public TObject */{
 		
 		void SetGeometry( WCSimRootGeom * wGeo, double dDarkRate_Normal=8.4, double dDarkRate_mPMT=100. );
 		void SetTrueVertexInfo(std::vector<double> vtx, double time);
+		void SetNThread(int iThread=N_THREAD) { fThread=iThread; }
 		
 		struct FitterOutput {
 		
@@ -145,7 +159,7 @@ class BQFitter/* : public TObject */{
 			}
 			else { 		      // mPMT
 			
-#ifdef WCSIM_wo_mPMT
+#ifdef WCSIM_single_PMT_type
 				//Reject hit if it's not from a standard PMT
 				return;
 #endif
@@ -177,6 +191,7 @@ class BQFitter/* : public TObject */{
 		void Init();
 		void LoadSplines();
 		void LoadPMTInfo();
+		void MakeMPMTReferencial(int iPMT);
 		void MakePositionList();
 		
 		double GetDistanceOld(std::vector<double> A, std::vector<double> B);
@@ -222,6 +237,8 @@ class BQFitter/* : public TObject */{
 						int nCandidates = 1, int tolerance = 1, int verbose=0, bool likelihood=false, bool average=false,
 						double lowerLimit=fSTimePDFLimitsQueueNegative, double upperLimit=fSTimePDFLimitsQueuePositive, int directionality = true);
 
+		
+		void VectorVertexPMT( std::vector<double> vertex, int iPMT, double* dAngles );
 	// Variables:
 	private:
 	
@@ -274,11 +291,16 @@ class BQFitter/* : public TObject */{
 		static BQFitter* myFitter;
 
 		// Spline
-		TSpline3 * fSplineTimePDFQueue[NPMT_CONFIGURATION];
-		TSpline3 * fSplineTimePDFDarkRate[NPMT_CONFIGURATION];
+		TSpline3 *	fSplineTimePDFQueue[NPMT_CONFIGURATION];
+		TSpline3 *	fSplineTimePDFDarkRate[NPMT_CONFIGURATION];
 		
 		// Histo
-		TH1D * hPMTDirectionality_1D[NPMT_CONFIGURATION][NGROUP_PMT];
+		//TH1D * 	hPMTDirectionality_1D[NPMT_CONFIGURATION][NGROUP_PMT];
+		//TH2D * 	hPMTDirectionality_2D[NPMT_CONFIGURATION][NGROUP_PMT];
+		TGraph2D * 	gPMTDirectionality_2D[NPMT_CONFIGURATION][NGROUP_PMT];
+				
+		// TF1
+		TF1 * 		fDistResponsePMT[NPMT_CONFIGURATION];
 		
 		
 		double fDarkRate_dir_proba[NPMT_CONFIGURATION][NGROUP_PMT];
@@ -302,7 +324,6 @@ class BQFitter/* : public TObject */{
 		double fTankHeight;
 		double fTankHalfHeight;
 		double fLightSpeed;
-		double fSearchVtxStep;
 		
 		// Fitter parameters:
 		double fIntegrationTimeWindow;
@@ -311,6 +332,8 @@ class BQFitter/* : public TObject */{
 		bool   fLimit_mPMT;
 		int    fAveraging;
 		bool   fHighEnergy;
+		double fSearchVtxStep;
+		double fSearchVtxTolerance;
 		
 		// WCSim objects:
 		WCSimRootGeom * fWCGeo;
@@ -352,6 +375,7 @@ class BQFitter/* : public TObject */{
 		std::vector< PMTHitExt > fInTime20;
 		std::vector< PMTHitExt > fInTime30;
 		std::vector< PMTHitExt > fInTime50;
+		std::vector< PMTHitExt > fHitExtInfo;
 		
 		// Random generator
 		TRandom3 * fRand;
@@ -370,10 +394,19 @@ class BQFitter/* : public TObject */{
 		std::vector<int> 			fPMT_Group; 
 		std::vector<int> 			fPMT_TubeInMPMT; 
 		
+		// mPMT Referencial
+		std::vector<int> 			fPMT_RefInMPMT; 
+		std::vector< std::vector<double> > 	fPMT_RefX;
+		std::vector< std::vector<double> > 	fPMT_RefY;
+		std::vector< std::vector<double> > 	fPMT_RefZ;
+		
+		
 		
 		double fLastLowerLimit;
 		double fLastUpperLimit;
 		struct EventInfo fEventInfo[NPMT_CONFIGURATION];
+		
+		int fThread;
 		
 		std::vector< std::vector<double> > fPositionList;
 		
@@ -421,6 +454,8 @@ class BQFitter/* : public TObject */{
 		// if Simple = true, energy is needed
 		std::vector<double> GetDirection(double dEnergy, std::vector<PMTHitExt> tInTime, bool bSimple, double dCutOff);
 		
+		// Return Bonsai-like goodness of fit
+		double GoodnessBonsai();
 		
 		void MakeAnalysis(int iType);
 
